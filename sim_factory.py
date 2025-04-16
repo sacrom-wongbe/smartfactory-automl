@@ -3,6 +3,27 @@ import random
 import pandas as pd
 from datetime import datetime, timedelta
 
+import requests
+
+API_GATEWAY_URL = "https://bwpwc9xl4h.execute-api.us-west-2.amazonaws.com/data"
+
+def send_to_aws(row_dict):
+    try:
+        response = requests.post(
+            API_GATEWAY_URL,
+            headers={'Content-Type': 'application/json'},
+            json=row_dict
+        )
+        if response.status_code != 200:
+            print(f"❌ Error sending row: {response.status_code}, {response.text}")
+        else:
+            print(f"✅ Row sent successfully: {row_dict['MachineID']} at {row_dict['Timestamp']}")
+    except Exception as e:
+        print("❌ Exception while sending row:", e)
+
+
+
+
 class Machine:
     def __init__(self, env, name):
         self.env = env
@@ -22,18 +43,22 @@ class Machine:
             throughput = self.get_throughput(status)
             error_code = self.get_error_code(status)
 
-            row = [
-                current_time.strftime('%Y-%m-%d %H:%M:%S'),
-                self.name,
-                status,
-                temperature,
-                energy,
-                vibration,
-                throughput,
-                error_code
-            ]
-            self.data.append(row)
-            # DEBUG PRINT
+            row_dict = {
+                "Timestamp": current_time.strftime('%Y-%m-%d %H:%M:%S'),
+                "MachineID": self.name,
+                "Status": status,
+                "Temperature": temperature,
+                "Energy_kWh": energy,
+                "Vibration": vibration,
+                "Throughput": throughput,
+                "ErrorCode": error_code
+            }
+            # Save a list version for local CSV storage
+            self.data.append(list(row_dict.values()))
+
+            # Send to AWS here
+            send_to_aws(row_dict)
+
             if len(self.data) % 50 == 0:
                 print(f"[{self.name}] Generated {len(self.data)} rows...")
 
